@@ -1,0 +1,54 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "A0 - smoke test",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["member_a/00_smoke_test.py"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "A1 - audit dataset",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "member_a/01_audit.py",
+        "--annotations", "data/annotations.csv",
+        "--audio-dir", "data/raw",
+        "--out", "member_a/data_audit_report.md"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "A2 - make splits",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "member_a/02_make_splits.py",
+        "--annotations", "data/annotations.csv",
+        "--speaker-col", "speaker_id",
+        "--utt-col", "audio_path",
+        "--label-col", "label",
+        "--text-col", "text",
+        "--out", "data/splits.csv",
+        "--seed", "42"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "A3 - verify splits",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "member_a/03_verify_splits.py",
+        "--splits", "data/splits.csv",
+        "--annotations", "data/annotations.csv",
+        "--audio-dir", "data/raw",
+        "--out", "member_a/splits_qa.md"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

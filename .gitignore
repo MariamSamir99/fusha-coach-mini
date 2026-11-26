@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Gated corpus: audio, annotations and archives must never be committed.
+# Licence: CC BY-NC-ND 4.0, access is granted per account.
+# ---------------------------------------------------------------------------
+data/*
+!data/.gitkeep
+!data/splits.csv
+!data/splits*.sha256
+!data/splits*.json
+
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.ogg
+*.zip
+*.rar
+*.7z
+annotations*.csv
+features*.parquet
+
+# model weights / checkpoints
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+models/
+!runs/**/metrics.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets.json
+*.token
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/*.log
+.idea/

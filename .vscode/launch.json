@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" },
+      "justMyCode": true
+    },
+    {
+      "name": "Python: audit dataset",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/member_a/01_audit.py",
+      "args": [
+        "--annotations", "data/annotations.csv",
+        "--audio-dir", "data/raw"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" }
+    },
+    {
+      "name": "Python: make splits",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/member_a/02_make_splits.py",
+      "args": [
+        "--annotations", "data/annotations.csv",
+        "--speaker-col", "speaker_id",
+        "--utt-col", "audio_path",
+        "--label-col", "label",
+        "--out", "data/splits.csv"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONUTF8": "1" }
+    }
+  ]
+}

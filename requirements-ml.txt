@@ -1,0 +1,13 @@
+# Member B only: pretrained Arabic phoneme ASR + feature extraction.
+#
+# IMPORTANT: PyTorch does not publish wheels for Python 3.14 yet.
+# Use a Python 3.12 environment for this group of packages:
+#
+#   py -3.12 -m venv .venv312
+#   .\.venv312\Scripts\Activate.ps1
+#   pip install -r requirements.txt -r requirements-ml.txt
+#
+torch>=2.2
+transformers>=4.40
+librosa>=0.10
+huggingface_hub>=0.23
