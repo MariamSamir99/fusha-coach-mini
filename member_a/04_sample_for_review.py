@@ -40,14 +40,14 @@ reframed as word-level mispronunciation, and that must be stated in the report.
 """
 
 
-def sample(df, splits, per_contrast, seed):
+def sample(df, splits, per_contrast, seed, label=1):
     sp = pd.read_csv(splits, dtype={"speaker_id": str})
     key = "audio_path"
     df = df.merge(sp[[key, "split"]], on=key, how="inner")
 
     rows = []
     for contrast in ("H", "S"):
-        pool = df[(df.split == "test") & (df.label == 1) &
+        pool = df[(df.split == "test") & (df.label == label) &
                   (df.contrast.fillna("").str.contains(contrast))]
         if pool.empty:
             print(f"[warn] no test errors for contrast {contrast}")
@@ -78,7 +78,7 @@ def write_csv(df, path):
         )
 
 
-def write_player(review, sheet_df):
+def write_player(review, sheet_df, label=1):
     """Offline interactive player: listen, pick a verdict, download the filled CSV.
 
     Removes Excel from the loop entirely - the browser rebuilds the same CSV.
@@ -87,6 +87,22 @@ def write_player(review, sheet_df):
 
     base = sheet_df[sorted(sheet_df.columns)].to_dict(orient="records")
     data_json = _json.dumps(base, ensure_ascii=False).replace("</", "<\\/")
+
+    if label == 1:
+        options = [("target", "target"), ("other", "other"),
+                   ("none", "none"), ("unsure", "unsure")]
+        title = "Label spot-check — 30 clips labelled mispronounced"
+        explain = ("<b>target</b> = the error is on the marked letter · "
+                   "<b>other</b> = word is wrong, but the error is elsewhere · "
+                   "<b>none</b> = sounds correct · <b>unsure</b> = cannot tell.")
+    else:
+        options = [("ok", "ok (sounds correct)"), ("wrong", "wrong (mispronounced)"),
+                   ("unsure", "unsure")]
+        title = "Label spot-check — 30 clips labelled correct"
+        explain = ("<b>ok</b> = the clip sounds correct · "
+                   "<b>wrong</b> = the clip sounds mispronounced · "
+                   "<b>unsure</b> = cannot tell.")
+    opts_html = "".join(f'<option value="{v}">{t}</option>' for v, t in options)
 
     rows = []
     for i, r in sheet_df.iterrows():
@@ -102,10 +118,7 @@ def write_player(review, sheet_df):
       <td>
         <select data-i="{i}" class="v">
           <option value=""></option>
-          <option value="target">target</option>
-          <option value="other">other</option>
-          <option value="none">none</option>
-          <option value="unsure">unsure</option>
+          {opts_html}
         </select>
       </td>
       <td><input data-i="{i}" class="n" placeholder="notes"></td>
@@ -132,10 +145,9 @@ def write_player(review, sheet_df):
          background:#1a7f37;color:#fff;cursor:pointer}}
  #count{{font-weight:600}}
 </style>
-<h1>Label spot-check — 30 clips</h1>
-<p>Listen to the <b>target letter only</b>. Pick one verdict per clip:
-<b>target</b> = the error is on that letter · <b>other</b> = wrong, but elsewhere ·
-<b>none</b> = sounds correct · <b>unsure</b> = cannot tell.</p>
+<h1>{title}</h1>
+<p>Listen to the <b>marked letter only</b>. Pick one verdict per clip:
+{explain}</p>
 <p>When all 30 are judged, press <b>Download review_sheet.csv</b> and replace the file in
 <code>member_a/review/</code>.</p>
 
@@ -210,10 +222,15 @@ def main():
     ap.add_argument("--summarize", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="rebuild the sheet even if verdicts were already entered")
+    ap.add_argument("--label", type=int, default=1, choices=[0, 1],
+                    help="1 = review clips labelled mispronounced, 0 = review clips labelled correct")
+    ap.add_argument("--sheet-name", default=None,
+                    help="override the sheet file name (use one per direction)")
     args = ap.parse_args()
 
     review = Path(args.review_dir)
-    sheet = review / "review_sheet.csv"
+    default_sheet = "review_sheet.csv" if args.label == 1 else "review_sheet_correct.csv"
+    sheet = review / (args.sheet_name or default_sheet)
 
     if args.summarize:
         if not sheet.exists():
@@ -226,27 +243,30 @@ def main():
                 "        If you already typed verdicts in Excel: press Ctrl+S, close\n"
                 "        the file, then run this command again."
             )
-        print(f"reviewed {len(filled)} / {len(df)} sampled errors\n")
+        is_pos = not sheet.name.endswith("_correct.csv")
+        agree = "target" if is_pos else "ok"
+        what = "target-phoneme errors" if is_pos else "agrees with label=correct"
+
+        print(f"reviewed {len(filled)} / {len(df)} sampled clips ({sheet.name})\n")
         print(filled.groupby(["contrast", "verdict"]).size().to_string())
         print()
         for c, g in filled.groupby("contrast"):
-            share = (g.verdict == "target").mean()
-            print(f"  {c}: target-phoneme errors = {share:.0%} ({int((g.verdict == 'target').sum())}"
-                  f"/{len(g)})")
-        overall = (filled.verdict == "target").mean()
+            share = (g.verdict == agree).mean()
+            print(f"  {c}: {what} = {share:.0%} ({int((g.verdict == agree).sum())}/{len(g)})")
+        overall = (filled.verdict == agree).mean()
         print(f"\n  overall = {overall:.0%}")
         print(f"  -> write this number into the report's limitations section")
 
-        out = review / "label_check.md"
+        out = review / ("label_check.md" if is_pos else "label_check_correct.md")
         lines = ["# Label spot-check", "",
-                 f"Sampled test errors reviewed: **{len(filled)} / {len(df)}**", "",
-                 "| contrast | target | other | none | unsure | target share |",
-                 "|---|---|---|---|---|---|"]
+                 f"Sheet: `{sheet.name}` · clips reviewed: **{len(filled)} / {len(df)}**", "",
+                 f"Agreement metric: **{what}**", "",
+                 "| contrast | " + " | ".join(sorted(filled.verdict.unique())) + " | agree |",
+                 "|---" * (len(sorted(filled.verdict.unique())) + 2) + "|"]
         for c, g in filled.groupby("contrast"):
             v = g.verdict.str.strip().str.lower().value_counts()
-            share = v.get("target", 0) / len(g)
-            lines.append(f"| {c} | {v.get('target', 0)} | {v.get('other', 0)} | "
-                         f"{v.get('none', 0)} | {v.get('unsure', 0)} | {share:.0%} |")
+            cols = " | ".join(str(v.get(k, 0)) for k in sorted(filled.verdict.unique()))
+            lines.append(f"| {c} | {cols} | {(g.verdict == agree).mean():.0%} |")
         lines += ["", "Write this table into the limitations section of the report."]
         out.write_text("\n".join(lines), encoding="utf-8")
         print(f"  -> table saved to {out}")
@@ -265,16 +285,17 @@ def main():
 
     df = pd.read_csv(args.annotations)
     df["contrast"] = df["contrast"].fillna("")
-    sampled = sample(df, args.splits, args.per_contrast, args.seed)
+    sampled = sample(df, args.splits, args.per_contrast, args.seed, args.label)
     if sampled.empty:
         raise SystemExit("[error] nothing sampled - check splits/annotations paths")
 
     review.mkdir(parents=True, exist_ok=True)
+    direction = "" if args.label == 1 else "neg"
     review_paths = []
     for _, r in sampled.iterrows():
         src = Path(args.audio_dir) / r.file
         # keep the speaker folder: basenames repeat across speakers (26_N.wav ...)
-        dest = review / r.contrast / Path(r.file)
+        dest = review / direction / r.contrast / Path(r.file)
         dest.parent.mkdir(parents=True, exist_ok=True)
         if src.exists():
             shutil.copy2(src, dest)
@@ -287,9 +308,10 @@ def main():
     sampled["verdict"] = ""
     sampled["notes"] = ""
     write_csv(sampled, sheet)
-    player = write_player(review, sampled)
+    player = write_player(review, sampled, label=args.label)
 
-    print(f"[ok] {len(sampled)} files copied to {review}/<H|S>/")
+    kind = "mispronounced" if args.label == 1 else "correct"
+    print(f"[ok] {len(sampled)} {kind} clips copied to {review}/<H|S>/")
     print(f"[ok] sheet: {sheet}")
     print(f"[ok] player: {player}   (double-click to open in the browser)")
     print(f"[info] contrast split: {sampled.contrast.value_counts().to_dict()}")
