@@ -37,6 +37,28 @@ By target letter:
 | س | 4 | 6 | 1 | 2 |
 | ص | 0 | 1 | 1 | 0 |
 
+## Reverse check — clips labelled correct
+
+20 clips sampled from the same held-out split with label `0`, judged as whole words.
+
+| contrast | ok | wrong | unsure | agreement |
+|---|---|---|---|---|
+| H | 7 | 1 | 2 | 70% |
+| S | 7 | 1 | 2 | 70% |
+| **total** | **14** | **2** | **4** | **70%** (87.5% excluding unsure) |
+
+So the noise is **asymmetric**: the corpus over-marks errors far more than it
+misses them. Reading the two checks together, at word level:
+
+- of the clips labelled mispronounced, roughly **60%** really are wrong
+  (`target` + `other` = 18/30), **27%** sound correct, 13% undecided;
+- of the clips labelled correct, roughly **88%** (excluding unsure) really are correct.
+
+Approximate positive-class precision of the labels: **0.60–0.73**. This caps the
+F1 any model can reach on this corpus: a perfect system cannot exceed roughly
+0.75–0.80 because the labels themselves disagree with a careful human listener
+on a quarter of the positive class.
+
 ## Interpretation
 
 1. **The label is word-level, not phoneme-level.** Only 17% of the
@@ -68,9 +90,13 @@ recorded in `docs/decisions.md` and should be mentioned to the instructor.
 > The corpus provides utterance-level labels only. A manual audit of 30
 > mispronounced held-out clips found that 5 (17%) of the perceived errors fell
 > on the targeted consonant; 13 (43%) were errors elsewhere in the word and 8
-> (27%) sounded correct. We therefore report word-level mispronunciation
-> detection and treat phoneme posteriors as input features rather than as
-> scoring targets. Estimates from 30 clips carry roughly ±13 percentage points
-> at 95% confidence, so the audit establishes a direction, not a precise error
-> rate. A phoneme-level claim would require a corpus annotated at the phoneme
-> level.
+> (27%) sounded correct. A reverse audit of 20 clips labelled correct found 14
+> (70%) to be correct, 2 (10%) mispronounced and 4 (20%) undecidable. The noise
+> is therefore asymmetric: labels over-mark errors rather than missing them,
+> and the effective precision of the positive class is roughly 0.60-0.73. We
+> therefore report word-level mispronunciation detection and treat phoneme
+> posteriors as input features rather than as scoring targets; the ceiling this
+> imposes on F1 is stated alongside the results. Estimates from 30 and 20 clips
+> carry roughly ±13 and ±16 percentage points at 95% confidence, so the audits
+> establish a direction, not a precise error rate. A phoneme-level claim would
+> require a corpus annotated at the phoneme level.

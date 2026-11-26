@@ -115,6 +115,21 @@ input features. See `member_a/label_findings.md` for the limitations paragraph.
 
 Statistical caveat: n = 30 → roughly ±13 percentage points at 95% confidence.
 
+### 6b. Reverse check — clips labelled correct
+
+| verdict | count | share |
+|---|---|---|
+| ok (really correct) | 14 | **70%** |
+| wrong (really mispronounced) | 2 | 10% |
+| unsure | 4 | 20% |
+
+Per contrast: 7 ok / 1 wrong / 2 unsure for both H and S.
+Excluding unsure: **87.5% agreement**.
+
+**Combined reading:** the noise is **asymmetric** — the corpus over-marks errors
+rather than missing them. Estimated positive-class precision of the labels:
+**0.60–0.73**, which caps achievable F1 at roughly **0.75–0.80** on this corpus.
+
 ---
 
 ## 7. Demo prompts
@@ -129,6 +144,9 @@ Each row carries the letter to highlight and one short English tip.
 
 1. Licence undeclared; speaker ages/provenance undocumented.
 2. Labels are utterance-level (see §6), not phoneme-level.
+3. **Label noise is ~27% in the positive class and ~12% in the negative class**
+   (asymmetric over-marking), which caps F1 at roughly 0.75–0.80. No attempt is
+   made to clean the whole corpus; the audit quantifies the ceiling instead.
 3. Positive class is 14% — precision/recall must be reported per class, and
    macro-F1 is the primary metric.
 4. Test holds 146 errors; a difference smaller than a few points is noise.

@@ -88,19 +88,21 @@ def write_player(review, sheet_df, label=1):
     base = sheet_df[sorted(sheet_df.columns)].to_dict(orient="records")
     data_json = _json.dumps(base, ensure_ascii=False).replace("</", "<\\/")
 
+    download_name = "review_sheet.csv" if label == 1 else "review_sheet_correct.csv"
+
     if label == 1:
         options = [("target", "target"), ("other", "other"),
                    ("none", "none"), ("unsure", "unsure")]
-        title = "Label spot-check — 30 clips labelled mispronounced"
-        explain = ("<b>target</b> = the error is on the marked letter · "
-                   "<b>other</b> = word is wrong, but the error is elsewhere · "
-                   "<b>none</b> = sounds correct · <b>unsure</b> = cannot tell.")
+        title = "Label spot-check - clips labelled mispronounced"
+        explain = ("<b>target</b> = the error is on the marked letter - "
+                   "<b>other</b> = word is wrong, but the error is elsewhere - "
+                   "<b>none</b> = sounds correct - <b>unsure</b> = cannot tell.")
     else:
         options = [("ok", "ok (sounds correct)"), ("wrong", "wrong (mispronounced)"),
                    ("unsure", "unsure")]
-        title = "Label spot-check — 30 clips labelled correct"
-        explain = ("<b>ok</b> = the clip sounds correct · "
-                   "<b>wrong</b> = the clip sounds mispronounced · "
+        title = "Label spot-check - clips labelled correct"
+        explain = ("<b>ok</b> = the clip sounds correct - "
+                   "<b>wrong</b> = the clip sounds mispronounced - "
                    "<b>unsure</b> = cannot tell.")
     opts_html = "".join(f'<option value="{v}">{t}</option>' for v, t in options)
 
@@ -148,8 +150,11 @@ def write_player(review, sheet_df, label=1):
 <h1>{title}</h1>
 <p>Listen to the <b>marked letter only</b>. Pick one verdict per clip:
 {explain}</p>
-<p>When all 30 are judged, press <b>Download review_sheet.csv</b> and replace the file in
+<p>When all clips are judged, press <b>Download {download_name}</b> and replace the file in
 <code>member_a/review/</code>.</p>
+<p style="background:#fff4e5;border-left:4px solid #d97706;padding:9px 12px">
+<b>Nothing is saved until you download.</b> Judgements live only in this browser tab.
+Closing the tab loses them.</p>
 
 <table>
 <tr><th>#</th><th>contrast</th><th>word</th><th>letter</th><th>speaker</th><th>audio</th>
@@ -194,7 +199,7 @@ function download() {{
   const blob = new Blob(['\\ufeff' + lines.join('\\r\\n')], {{type: 'text/csv;charset=utf-8'}});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'review_sheet.csv';
+  a.download = {download_name!r};
   a.click();
   const missing = rows.filter(r => !r.verdict).length;
   document.getElementById('msg').textContent =
@@ -220,6 +225,8 @@ def main():
     ap.add_argument("--per-contrast", type=int, default=15)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--summarize", action="store_true")
+    ap.add_argument("--status", action="store_true",
+                    help="show how many verdicts each sheet has collected")
     ap.add_argument("--force", action="store_true",
                     help="rebuild the sheet even if verdicts were already entered")
     ap.add_argument("--label", type=int, default=1, choices=[0, 1],
@@ -231,6 +238,21 @@ def main():
     review = Path(args.review_dir)
     default_sheet = "review_sheet.csv" if args.label == 1 else "review_sheet_correct.csv"
     sheet = review / (args.sheet_name or default_sheet)
+
+    if args.status:
+        for name, what in (("review_sheet.csv", "clips labelled mispronounced"),
+                           ("review_sheet_correct.csv", "clips labelled correct")):
+            p = review / name
+            if not p.exists():
+                print(f"  {name:28} missing - not sampled yet")
+                continue
+            d = read_sheet(p)
+            done = int((d.verdict.str.strip() != "").sum())
+            flag = "done" if done == len(d) else ("EMPTY - nothing downloaded" if done == 0
+                                                  else "in progress")
+            print(f"  {name:28} {done:2}/{len(d):2} judged  ({what})  -> {flag}")
+        print("\nJudgements are made in the browser and only reach disk when you press Download.")
+        return
 
     if args.summarize:
         if not sheet.exists():
