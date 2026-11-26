@@ -57,6 +57,8 @@ data/
 | `03_verify_splits.py` | 17 QA checks, blocks the hand-off on leakage or a weak test set | `splits_qa.md` |
 | `prepare_dataset.py` | unpacks audio embedded in a parquet dump into `data/raw/` + `data/annotations.csv` | annotation table |
 | `make_phoneme_map.py` | writes the prompt / target-phoneme map with live counts | `docs/phoneme_map.md` |
+| `04_sample_for_review.py` | samples test errors per contrast for a manual listen, then summarises agreement | `review/review_sheet.csv` |
+| `05_select_prompts.py` | picks the 10-20 demo prompts by error frequency | `docs/prompts.csv`, `docs/prompts.md` |
 
 Run order:
 
@@ -86,20 +88,32 @@ printed by `01_audit.py`; the guesses are only defaults.
 
 ## Deliverables
 
-| Item | Due | Acceptance |
+| Item | Status | Acceptance |
 |---|---|---|
-| `data_audit_report.md` | day 2 | real counts: speakers, files, errors per contrast |
-| Written scope decision (one contrast or two) | day 3 | justified by positive/negative counts |
-| `data/splits.csv` + sha256 | day 4 | speaker-disjoint, frozen |
-| `docs/phoneme_map.md` | day 4 | prompt → phoneme sequence → target + competitor |
+| `data_audit_report.md` | done | real counts: speakers, files, errors per contrast |
+| Written scope decision (one contrast or two) | done — two | justified by per-contrast error counts |
+| `data/splits.csv` + sha256 | done, frozen | speaker-disjoint, 17 QA checks pass |
+| `docs/phoneme_map.md` | done | prompt → target + competitor + counts |
+| `docs/prompts.csv` | done | 10-20 prompts with the English tip for the demo |
+| `review/review_sheet.csv` | **open — needs a human ear** | target-phoneme agreement rate |
 
-## Decisions to make (not just scripts)
+## Remaining work (two items, both human)
 
-1. Can each contrast supply enough mispronounced examples?
-   Below roughly 60–80 negatives per contrast, drop to one contrast.
-2. Which prompts to keep (10–20 short, fully vowelised words/phrases).
-3. If the test set ends up with fewer than ~30 errors, report the limitation
-   instead of claiming a statistically meaningful F1 difference.
+1. **Label spot-check.** 30 mispronounced test clips are already copied to
+   `member_a/review/H/` and `member_a/review/S/`. Listen, fill the `verdict`
+   column in `review_sheet.csv` (`target` / `other` / `none` / `unsure`), then:
+
+   ```powershell
+   python member_a/04_sample_for_review.py --summarize
+   ```
+
+   The resulting share goes into the report's limitations section. If most
+   errors are *not* on the target letter, the task must be described as
+   word-level mispronunciation, not phoneme-level.
+
+2. **Licence confirmation.** The working corpus declares no licence. Email the
+   uploader (or ask the instructor) before any number is published; until then
+   the corpus is used for pipeline bring-up only.
 
 ## Rules
 

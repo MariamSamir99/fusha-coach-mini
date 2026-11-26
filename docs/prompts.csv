@@ -1,0 +1,17 @@
+prompt_id,arabic,contrast,target_letter,n_utts,n_errors,error_rate,tip_en
+H01,الحقيقة,H,ح,69,20,0.29,"For ح the friction is deep in the throat, not at the lips. Say a tired 'ahh' and tighten the pharynx."
+H02,الذهاب,H,ه,69,14,0.203,"هـ is a light breath from the open glottis. If you hear friction like clearing your throat, you said ح instead."
+H03,حالك,H,ح,65,10,0.154,Hold the constriction of ح through the vowel that follows it; do not let it relax into هـ at the end of the word.
+H04,مرحباً,H,ح,71,8,0.113,Think of fogging a mirror very softly: that is هـ. ح needs visible effort in the throat.
+H05,الحياة,H,ح,70,8,0.114,"For ح the friction is deep in the throat, not at the lips. Say a tired 'ahh' and tighten the pharynx."
+H06,صحيح,H,ح,69,8,0.116,"هـ is a light breath from the open glottis. If you hear friction like clearing your throat, you said ح instead."
+H07,التحدث,H,ح,29,7,0.241,Hold the constriction of ح through the vowel that follows it; do not let it relax into هـ at the end of the word.
+H08,الهاتف,H,ه,27,7,0.259,Think of fogging a mirror very softly: that is هـ. ح needs visible effort in the throat.
+S01,أستطيع,S,س,72,13,0.181,For ص pull the tongue body back and hollow the mouth; the sound is darker and heavier than س.
+S02,صديقي,S,ص,29,11,0.379,س is a front hiss near the teeth. In ص the tongue retreats and the resonance moves to the back of the mouth.
+S03,الشمس,S,س,30,10,0.333,Keep the emphasis of ص through the whole syllable - it colours the neighbouring vowels.
+S04,صحيح,S,ص,69,8,0.116,"If ص sounds like a plain س, the tongue tip is too far forward. Retract it and lower the jaw slightly."
+S05,آسف,S,س,71,7,0.099,For ص pull the tongue body back and hollow the mouth; the sound is darker and heavier than س.
+S06,السيارة,S,س,70,7,0.1,س is a front hiss near the teeth. In ص the tongue retreats and the resonance moves to the back of the mouth.
+S07,رسالة,S,س,30,7,0.233,Keep the emphasis of ص through the whole syllable - it colours the neighbouring vowels.
+S08,الصباح,S,ص,20,7,0.35,"If ص sounds like a plain س, the tongue tip is too far forward. Retract it and lower the jaw slightly."
