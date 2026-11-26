@@ -79,33 +79,120 @@ def write_csv(df, path):
 
 
 def write_player(review, sheet_df):
-    """Offline HTML player: one row per clip, click to listen, verdict shown."""
+    """Offline interactive player: listen, pick a verdict, download the filled CSV.
+
+    Removes Excel from the loop entirely - the browser rebuilds the same CSV.
+    """
+    import json as _json
+
+    base = sheet_df[sorted(sheet_df.columns)].to_dict(orient="records")
+    data_json = _json.dumps(base, ensure_ascii=False).replace("</", "<\\/")
+
     rows = []
-    for _, r in sheet_df.iterrows():
-        rel = Path(r.review_path).as_posix().replace("member_a/review/", "") if r.review_path else ""
-        rows.append(
-            f'<tr><td>{r.contrast}</td><td dir="rtl" style="font-size:20px">{r.word}</td>'
-            f'<td>{r.target_letter}</td><td>{r.speaker_id}</td>'
-            f'<td><audio controls preload="none" src="{rel}"></audio></td>'
-            f'<td><code>{r.verdict or "-"}</code></td></tr>'
-        )
+    for i, r in sheet_df.iterrows():
+        rel = Path(r.review_path).as_posix().replace(f"{review.as_posix()}/", "") if r.review_path else ""
+        rows.append(f"""
+    <tr id="r{i}">
+      <td class="c">{i + 1}</td>
+      <td class="c">{r.contrast}</td>
+      <td class="w" dir="rtl">{r.word}</td>
+      <td class="l">{r.target_letter}</td>
+      <td class="s">{r.speaker_id}</td>
+      <td><audio controls preload="none" src="{rel}"></audio></td>
+      <td>
+        <select data-i="{i}" class="v">
+          <option value=""></option>
+          <option value="target">target</option>
+          <option value="other">other</option>
+          <option value="none">none</option>
+          <option value="unsure">unsure</option>
+        </select>
+      </td>
+      <td><input data-i="{i}" class="n" placeholder="notes"></td>
+    </tr>""")
+
     html = f"""<!doctype html>
-<meta charset="utf-8">
+<html lang="en"><meta charset="utf-8">
 <title>Label spot-check</title>
 <style>
  body{{font-family:system-ui,Segoe UI,Arial;margin:24px;background:#fafafa;color:#222}}
- table{{border-collapse:collapse;background:#fff}}
- th,td{{border:1px solid #ddd;padding:6px 10px;text-align:left}}
- th{{background:#f0f0f0}}
- tr:nth-child(even){{background:#fbfbfb}}
+ h1{{font-size:19px;margin:0 0 4px}}
+ p{{margin:6px 0;color:#555;font-size:14px}}
+ table{{border-collapse:collapse;background:#fff;margin-top:14px}}
+ th,td{{border:1px solid #e2e2e2;padding:5px 9px;font-size:14px}}
+ th{{background:#f2f2f2;position:sticky;top:0}}
+ tr.done{{background:#f0fbf3}}
+ .w{{font-size:19px;min-width:90px}}
+ .c,.l,.s{{text-align:center;color:#666}}
+ audio{{height:32px;width:230px}}
+ select,input{{padding:4px;font-size:13px}}
+ #bar{{position:sticky;bottom:0;background:#fff;border-top:2px solid #ddd;padding:12px;
+       margin-top:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}}
+ button{{padding:9px 16px;font-size:14px;border-radius:6px;border:1px solid #1a7f37;
+         background:#1a7f37;color:#fff;cursor:pointer}}
+ #count{{font-weight:600}}
 </style>
-<h2>Label spot-check — listen, then fill the CSV</h2>
-<p>Write one of <code>target</code>, <code>other</code>, <code>none</code>, <code>unsure</code>
-in the <code>verdict</code> column of <code>review_sheet.csv</code>.</p>
+<h1>Label spot-check — 30 clips</h1>
+<p>Listen to the <b>target letter only</b>. Pick one verdict per clip:
+<b>target</b> = the error is on that letter · <b>other</b> = wrong, but elsewhere ·
+<b>none</b> = sounds correct · <b>unsure</b> = cannot tell.</p>
+<p>When all 30 are judged, press <b>Download review_sheet.csv</b> and replace the file in
+<code>member_a/review/</code>.</p>
+
 <table>
-<tr><th>contrast</th><th>word</th><th>letter</th><th>speaker</th><th>audio</th><th>verdict</th></tr>
+<tr><th>#</th><th>contrast</th><th>word</th><th>letter</th><th>speaker</th><th>audio</th>
+    <th>verdict</th><th>notes</th></tr>
 {''.join(rows)}
 </table>
+
+<div id="bar">
+  <span id="count">0 / 30 judged</span>
+  <button onclick="download()">Download review_sheet.csv</button>
+  <span id="msg"></span>
+</div>
+
+<script>
+const BASE = {data_json};
+const COLS = {_json.dumps(sorted(sheet_df.columns))};
+
+function refresh() {{
+  let n = 0;
+  document.querySelectorAll('select.v').forEach(s => {{
+    const tr = s.closest('tr');
+    if (s.value) {{ n++; tr.classList.add('done'); }} else {{ tr.classList.remove('done'); }}
+  }});
+  document.getElementById('count').textContent = n + ' / ' + BASE.length + ' judged';
+}}
+
+function esc(v) {{
+  v = (v === undefined || v === null) ? '' : String(v);
+  return '"' + v.replace(/"/g, '""') + '"';
+}}
+
+function download() {{
+  const rows = BASE.map((r, i) => Object.assign({{}}, r));
+  document.querySelectorAll('select.v').forEach(s => {{
+    rows[+s.dataset.i].verdict = s.value;
+  }});
+  document.querySelectorAll('input.n').forEach(inp => {{
+    rows[+inp.dataset.i].notes = inp.value;
+  }});
+  const lines = [COLS.map(esc).join(',')];
+  rows.forEach(r => lines.push(COLS.map(c => esc(r[c])).join(',')));
+  const blob = new Blob(['\\ufeff' + lines.join('\\r\\n')], {{type: 'text/csv;charset=utf-8'}});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'review_sheet.csv';
+  a.click();
+  const missing = rows.filter(r => !r.verdict).length;
+  document.getElementById('msg').textContent =
+    missing ? 'downloaded with ' + missing + ' clips still unjudged' : 'downloaded - all 30 judged';
+}}
+
+document.querySelectorAll('select.v').forEach(s => s.addEventListener('change', refresh));
+refresh();
+</script>
+</html>
 """
     out = review / "review.html"
     out.write_text(html, encoding="utf-8")
