@@ -1,16 +1,10 @@
 # fusha-coach-mini
 
 Phoneme-level mispronunciation detection for non-native learners of Modern Standard Arabic (MSA) — Speech Recognition course project.
-
-Targeted phoneme-level pronunciation feedback for non-native learners of Modern Standard Arabic.
-Two contrasts (ح/هـ, ص/س), frozen wav2vec2 baseline, calibrated error detection, speaker-disjoint
-evaluation, and a single-page Gradio demo.
-
 > Note on granularity: the working corpus labels whole utterances, so detection is evaluated at
 > **word** level with phoneme posteriors as model features. The audit behind that decision and the
 > measured label noise are recorded in `docs/decisions.md` and `member_a/label_findings.md`.
 
-Course project — Speech Recognition, Zewail City of Science, Technology and Innovation.
 
 The system takes a prompted MSA word/phrase plus a learner recording and classifies the
 pronunciation of one target consonant as **acceptable** or **mispronounced**, with
