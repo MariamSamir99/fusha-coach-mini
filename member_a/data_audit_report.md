@@ -10,9 +10,9 @@ Source: `data\annotations.csv`
 - unique speakers: **79**
 
 ## Audio
-- files found: **4842** (broken: 0)
+- files found: **4841** (broken: 0)
 - total duration: **0.90 h**
-- sample rates: `{16000: 4842}`
+- sample rates: `{16000: 4841}`
 
 ## Open items
 - [ ] licence terms read and recorded
