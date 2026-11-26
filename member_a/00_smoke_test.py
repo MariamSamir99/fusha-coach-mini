@@ -12,6 +12,7 @@ Usage:
 """
 
 import random
+import shutil
 import struct
 import subprocess
 import sys
@@ -24,8 +25,13 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 
 
-def make_fake_data(root: Path, n_speakers: int = 12, per_speaker: int = 5, seed: int = 0):
-    """Create n_speakers x per_speaker mono 16 kHz wav files plus annotations.csv."""
+def make_fake_data(root: Path, n_speakers: int = 13, per_speaker: int = 5, seed: int = 0):
+    """Create a synthetic corpus that deliberately contains the defects the
+    pipeline is supposed to catch:
+
+    * speaker S13 duplicates S12 byte for byte  -> leakage across speaker ids
+    * one zero-byte file under S11              -> unreadable clip
+    """
     random.seed(seed)
     audio = root / "audio"
     audio.mkdir(parents=True, exist_ok=True)
@@ -37,14 +43,24 @@ def make_fake_data(root: Path, n_speakers: int = 12, per_speaker: int = 5, seed:
     for s in range(1, n_speakers + 1):
         for u in range(per_speaker):
             name = f"spk{s:02d}_u{u}.wav"
-            with wave.open(str(audio / name), "w") as w:
-                w.setnchannels(1)
-                w.setsampwidth(2)
-                w.setframerate(16000)
-                frames = 16000 * random.randint(1, 3)
-                w.writeframes(
-                    b"".join(struct.pack("<h", random.randint(-3000, 3000)) for _ in range(frames))
-                )
+            dest = audio / name
+
+            if s == n_speakers:
+                # copy the previous speaker's bytes: identical audio, new speaker id
+                shutil.copy2(audio / f"spk{n_speakers - 1:02d}_u{u}.wav", dest)
+            elif s == 11 and u == 0:
+                dest.write_bytes(b"")          # zero-byte, unreadable
+            else:
+                with wave.open(str(dest), "w") as w:
+                    w.setnchannels(1)
+                    w.setsampwidth(2)
+                    w.setframerate(16000)
+                    frames = 16000 * random.randint(1, 3)
+                    w.writeframes(
+                        b"".join(struct.pack("<h", random.randint(-3000, 3000))
+                                 for _ in range(frames))
+                    )
+
             rows.append(
                 dict(
                     speaker_id=f"S{s:02d}",
@@ -81,10 +97,29 @@ def main():
             "--out", tmp / "data_audit_report.md"]) != 0:
         failures.append("01_audit.py")
 
+    # Integrity gate: finds the planted duplicate pair and the zero-byte clip,
+    # and writes the speaker -> group map that the split step needs.
+    if run([HERE / "06_check_integrity.py", "--annotations", ann,
+            "--audio-dir", tmp,
+            "--out-groups", tmp / "speaker_groups.csv",
+            "--out-report", tmp / "integrity_report.md"]) != 0:
+        failures.append("06_check_integrity.py")
+
+    # Splitting must refuse to run without the groups file, then succeed with it.
+    rc = run([HERE / "02_make_splits.py", "--annotations", ann,
+              "--speaker-col", "speaker_id", "--utt-col", "audio_path",
+              "--label-col", "label", "--text-col", "text",
+              "--contrast-col", "contrast", "--audio-dir", tmp,
+              "--out", tmp / "splits_no_groups.csv", "--seed", "42"])
+    if rc == 0:
+        print("[FAIL] split step accepted leaking data without --groups")
+        failures.append("02_make_splits.py integrity gate")
+
     if run([HERE / "02_make_splits.py", "--annotations", ann,
             "--speaker-col", "speaker_id", "--utt-col", "audio_path",
             "--label-col", "label", "--text-col", "text",
-            "--contrast-col", "contrast",
+            "--contrast-col", "contrast", "--audio-dir", tmp,
+            "--groups", tmp / "speaker_groups.csv",
             "--out", tmp / "splits.csv", "--seed", "42"]) != 0:
         failures.append("02_make_splits.py")
 

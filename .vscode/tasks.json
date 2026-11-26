@@ -22,7 +22,20 @@
       "problemMatcher": []
     },
     {
-      "label": "A2 - make splits",
+      "label": "A2 - integrity check",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": [
+        "member_a/06_check_integrity.py",
+        "--annotations", "data/annotations.csv",
+        "--audio-dir", "data/raw",
+        "--out-groups", "data/speaker_groups.csv",
+        "--out-report", "member_a/integrity_report.md"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "A3 - make splits",
       "type": "shell",
       "command": "${command:python.interpreterPath}",
       "args": [
@@ -32,13 +45,16 @@
         "--utt-col", "audio_path",
         "--label-col", "label",
         "--text-col", "text",
+        "--contrast-col", "contrast",
+        "--audio-dir", "data/raw",
+        "--groups", "data/speaker_groups.csv",
         "--out", "data/splits.csv",
         "--seed", "42"
       ],
       "problemMatcher": []
     },
     {
-      "label": "A3 - verify splits",
+      "label": "A4 - verify splits",
       "type": "shell",
       "command": "${command:python.interpreterPath}",
       "args": [

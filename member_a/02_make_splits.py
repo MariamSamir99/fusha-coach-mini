@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -39,6 +40,41 @@ def normalise_label(s):
     return pd.NA
 
 
+def duplicate_speaker_pairs(df, utt_col, spk_col, audio_dir):
+    """Return speaker pairs that share at least one byte-identical recording.
+
+    A duplicate across two speaker ids means the same recording can end up in
+    two splits, which invalidates the evaluation. Cheap enough to run always:
+    ~100 MB of audio hashes in about a second.
+    """
+    root = Path(audio_dir)
+    if not root.exists():
+        print(f"[warn] --audio-dir not found ({root}); integrity check skipped")
+        return set()
+
+    by_hash = defaultdict(set)
+    hashed = 0
+    for utt, spk in zip(df[utt_col].astype(str), df[spk_col].astype(str)):
+        f = root / utt
+        if not f.exists() or f.stat().st_size < 100:
+            continue
+        by_hash[hashlib.md5(f.read_bytes()).hexdigest()].add(spk)
+        hashed += 1
+
+    pairs = set()
+    for speakers in by_hash.values():
+        if len(speakers) > 1:
+            ordered = sorted(speakers)
+            for i, a in enumerate(ordered):
+                for b in ordered[i + 1:]:
+                    pairs.add((a, b))
+    if hashed:
+        print(f"[check] hashed {hashed} files; "
+              f"{sum(1 for v in by_hash.values() if len(v) > 1)} duplicate groups "
+              f"across speaker ids")
+    return pairs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--annotations", required=True)
@@ -56,6 +92,10 @@ def main():
                          "(use when two ids share identical audio)")
     ap.add_argument("--group-speaker-col", default="speaker_id")
     ap.add_argument("--group-col", default="group_id")
+    ap.add_argument("--audio-dir", default="data/raw",
+                    help="used by the mandatory duplicate check")
+    ap.add_argument("--no-integrity", action="store_true",
+                    help="skip the duplicate check (not recommended)")
     args = ap.parse_args()
 
     try:
@@ -79,6 +119,27 @@ def main():
         df = df[df["_label"].notna()].copy()
     df["_label"] = df["_label"].astype(int)
     df["_speaker"] = df[args.speaker_col].astype(str)
+
+    # ---- mandatory integrity gate -------------------------------------------------
+    # Refuse to build a split that could leak: two speaker ids sharing identical
+    # audio must be declared as one group first.
+    if not args.no_integrity:
+        pairs = duplicate_speaker_pairs(df, args.utt_col, args.speaker_col, args.audio_dir)
+        if pairs:
+            if args.groups:
+                print(f"[ok] {len(pairs)} duplicate speaker pair(s) declared; "
+                      "splitting will keep each pair together")
+            else:
+                shown = ", ".join(f"{a} = {b}" for a, b in sorted(pairs)[:5])
+                sys.exit(
+                    "[refused] byte-identical recordings are shared by different speaker ids:\n"
+                    f"          {shown}\n"
+                    "          Splitting now would place the same recording in two splits.\n"
+                    "          Fix:\n"
+                    "            python member_a/06_check_integrity.py --splits data/splits.csv\n"
+                    "            python member_a/02_make_splits.py ... --groups data/speaker_groups.csv\n"
+                    "          (or pass --no-integrity if you are certain this is intentional)"
+                )
 
     # Speaker ids that share identical audio must move together.
     df["_group"] = df["_speaker"]

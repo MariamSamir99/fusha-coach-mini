@@ -70,9 +70,13 @@ python member_a/prepare_dataset.py --parquet data/_download/arabic_md.parquet
 
 python member_a/01_audit.py --annotations data/annotations.csv --audio-dir data/raw
 
+# integrity gate: finds byte-identical audio across speaker ids and writes the group map
+python member_a/06_check_integrity.py --annotations data/annotations.csv --audio-dir data/raw
+
 python member_a/02_make_splits.py --annotations data/annotations.csv ^
   --speaker-col speaker_id --utt-col audio_path --label-col label ^
-  --text-col text --contrast-col contrast --out data/splits.csv --seed 42
+  --text-col text --contrast-col contrast --audio-dir data/raw ^
+  --groups data/speaker_groups.csv --out data/splits.csv --seed 42
 
 python member_a/03_verify_splits.py --splits data/splits.csv ^
   --annotations data/annotations.csv --audio-dir data/raw --contrast-col contrast
