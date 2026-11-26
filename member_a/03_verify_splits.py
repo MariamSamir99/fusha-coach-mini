@@ -101,10 +101,12 @@ def main():
     test_pos = int(pd.to_numeric(test[args.label_col], errors="coerce").sum())
     test_neg = len(test) - test_pos
     check("test has enough ERROR examples", test_pos >= args.min_test_pos,
-          f"{test_pos} < {args.min_test_pos}: F1 differences will be noise",
+          "" if test_pos >= args.min_test_pos
+          else f"{test_pos} < {args.min_test_pos}: F1 differences will be noise",
           level=None if test_pos >= args.min_test_pos else WARN)
     check("test has enough CORRECT examples", test_neg >= args.min_test_neg,
-          f"{test_neg} < {args.min_test_neg}: false-accept rate unreliable",
+          "" if test_neg >= args.min_test_neg
+          else f"{test_neg} < {args.min_test_neg}: false-accept rate unreliable",
           level=None if test_neg >= args.min_test_neg else WARN)
 
     # 6. per-contrast view
@@ -118,7 +120,8 @@ def main():
             n = int(mask.sum())
             pos = int(pd.to_numeric(sp.loc[mask, args.label_col], errors="coerce").sum())
             check(f"contrast '{contrast}' usable on test", pos >= 15,
-                  f"test rows={n}, wrong={pos}", level=None if pos >= 15 else WARN)
+                  f"test rows={n}, wrong={pos}",
+                  level=None if pos >= 15 else WARN)
 
     # 7. audio files exist
     if args.audio_dir:

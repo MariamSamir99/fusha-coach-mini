@@ -95,6 +95,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--annotations", required=True, help="path to annotations.csv")
     ap.add_argument("--audio-dir", default=None, help="folder containing the audio")
+    ap.add_argument("--name", default=None, help="dataset name used in the report title")
     ap.add_argument("--out", default="member_a/data_audit_report.md")
     args = ap.parse_args()
 
@@ -188,12 +189,13 @@ def main():
     # ---------------- report ----------------
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["# Data Audit — L2-KSU", "", f"Source: `{ann}`", "", "## Annotation table",
+    title = f"# Data Audit - {args.name or ann.stem}"
+    lines = [title, "", f"Source: `{ann}`", "", "## Annotation table",
              f"- rows: **{len(df)}**",
              f"- columns: `{list(df.columns)}`",
              f"- detected roles: `{cols}`"]
     if label_stats:
-        lines.append(f"- mispronounced: **{label_stats['pos']}** · correct: **{label_stats['neg']}**")
+        lines.append(f"- mispronounced: **{label_stats['pos']}** | correct: **{label_stats['neg']}**")
     if "speaker" in cols:
         lines.append(f"- unique speakers: **{df[cols['speaker']].nunique()}**")
     if inv is not None:
@@ -207,6 +209,31 @@ def main():
               "- [ ] licence terms read and recorded",
               "- [ ] contrast selection justified with per-phoneme counts",
               "- [ ] decision recorded: one contrast or two"]
+
+    # Auto-computed scope table: counts per contrast at target-phoneme level, so a
+    # word carrying both target letters (e.g. صباح) contributes to both rows.
+    if "contrast" in df.columns:
+        tag = df["contrast"].fillna("").astype(str)
+        lab = normalise_labels(df[cols["label"]])[0] if "label" in cols else None
+        codes = sorted({c for t in tag for c in t.split("+") if c})
+        if codes:
+            lines += ["", "## Scope candidates (auto)", "",
+                      "Counts are at **target-phoneme level**: a word containing both target",
+                      "letters is counted once per contrast.", "",
+                      "| contrast | utterances | mispronounced | error rate |",
+                      "|---|---|---|---|"]
+            for code in codes:
+                idx = tag[tag.str.contains(code, regex=False)].index
+                sub = df.loc[idx]
+                pos = int((lab.loc[idx] == 1).sum()) if lab is not None else 0
+                rate = pos / len(sub) if len(sub) else 0.0
+                lines.append(f"| {code} | {len(sub)} | {pos} | {rate:.3f} |")
+            lines += ["",
+                      "Keep two contrasts only if each has enough mispronounced examples to "
+                      "survive a 60/20/20 speaker split (rule of thumb: >= 60 errors per "
+                      "contrast before splitting). Otherwise reduce to one contrast and say so "
+                      "in the report instead of claiming a reliable comparison."]
+
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n[ok] wrote {out}")
 

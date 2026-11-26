@@ -12,6 +12,13 @@ folder produces, so they are frozen before anyone else starts modelling.
 | Arabic-Dataset-for-CAPT | https://github.com/bhalima/Arabic-Dataset-for-CAPT | open | optional sanity check only (children, 9 speakers x 16 prompts) |
 | IQRA 2026 | https://arxiv.org/abs/2603.29087 | open | fallback corpus with a published MDD protocol |
 
+**Current working corpus:** `MON3EMPASHA/arabic_mispronunciation_dataset`
+(open, no gate: 4,842 utterances, 79 speakers, 100 words, 686 mispronounced,
+16 kHz mono, 0.90 h). Used to bring the pipeline up while the L2-KSU gate is
+blocked; every script is dataset-agnostic and only reads `data/annotations.csv`.
+The licence of that corpus is undeclared, so it is not redistributed and its use
+is recorded in `docs/decisions.md`.
+
 Licence of L2-KSU: **CC BY-NC-ND 4.0**. Research use inside this project is fine;
 redistribution of audio or derivatives is not.
 
@@ -47,21 +54,28 @@ data/
 | `00_smoke_test.py` | verifies the environment on synthetic data | PASS / FAIL |
 | `01_audit.py` | counts speakers, hours, labels, per-phoneme errors, broken files | `data_audit_report.md` |
 | `02_make_splits.py` | speaker-disjoint 60/20/20 split, frozen with sha256 | `data/splits.csv` |
-| `03_verify_splits.py` | 16 QA checks, blocks the hand-off on leakage or a weak test set | `splits_qa.md` |
+| `03_verify_splits.py` | 17 QA checks, blocks the hand-off on leakage or a weak test set | `splits_qa.md` |
+| `prepare_dataset.py` | unpacks audio embedded in a parquet dump into `data/raw/` + `data/annotations.csv` | annotation table |
+| `make_phoneme_map.py` | writes the prompt / target-phoneme map with live counts | `docs/phoneme_map.md` |
 
 Run order:
 
 ```powershell
 python member_a/00_smoke_test.py
 
+# only when the corpus ships audio inside a parquet dump
+python member_a/prepare_dataset.py --parquet data/_download/arabic_md.parquet
+
 python member_a/01_audit.py --annotations data/annotations.csv --audio-dir data/raw
 
 python member_a/02_make_splits.py --annotations data/annotations.csv ^
   --speaker-col speaker_id --utt-col audio_path --label-col label ^
-  --text-col text --out data/splits.csv --seed 42
+  --text-col text --contrast-col contrast --out data/splits.csv --seed 42
 
 python member_a/03_verify_splits.py --splits data/splits.csv ^
-  --annotations data/annotations.csv --audio-dir data/raw
+  --annotations data/annotations.csv --audio-dir data/raw --contrast-col contrast
+
+python member_a/make_phoneme_map.py --annotations data/annotations.csv
 ```
 
 In VS Code use `Ctrl+Shift+B` for the smoke test, or the tasks
