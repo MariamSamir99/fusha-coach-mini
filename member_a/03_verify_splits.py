@@ -83,6 +83,19 @@ def main():
     check("each speaker in exactly one split", multi.empty,
           f"{len(multi)} speakers spread across splits")
 
+    # 3b. group disjointness (two ids that share identical audio must stay together)
+    if "group_id" in sp.columns:
+        gsets = {s: set(sp.loc[sp["split"] == s, "group_id"].astype(str))
+                 for s in ("train", "val", "test")}
+        gleaks = []
+        for a, b in (("train", "val"), ("train", "test"), ("val", "test")):
+            common = gsets[a] & gsets[b]
+            if common:
+                gleaks.append(f"{a}&{b}: {sorted(common)[:5]}")
+        check("group-disjoint (identical-audio ids together)", not gleaks, "; ".join(leaks))
+        check("group count is reported", True,
+              f"{sp['group_id'].nunique()} groups / {sp[args.speaker_col].nunique()} speakers")
+
     # 4. label domain
     labels = pd.to_numeric(sp[args.label_col], errors="coerce")
     bad = int(labels.isna().sum() + (~labels.isin([0, 1])).sum())

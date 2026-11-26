@@ -51,6 +51,11 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--ratios", default="0.6,0.2,0.2")
     ap.add_argument("--min-test-pos", type=int, default=30)
+    ap.add_argument("--groups", default=None,
+                    help="CSV mapping speaker_id,group_id - splits are built per group "
+                         "(use when two ids share identical audio)")
+    ap.add_argument("--group-speaker-col", default="speaker_id")
+    ap.add_argument("--group-col", default="group_id")
     args = ap.parse_args()
 
     try:
@@ -75,12 +80,24 @@ def main():
     df["_label"] = df["_label"].astype(int)
     df["_speaker"] = df[args.speaker_col].astype(str)
 
-    # ---- per-speaker table ----
-    spk = (df.groupby("_speaker")
-             .agg(n_utt=("_label", "size"), n_pos=("_label", "sum"))
+    # Speaker ids that share identical audio must move together.
+    df["_group"] = df["_speaker"]
+    if args.groups:
+        gm = pd.read_csv(args.groups, dtype=str)
+        mapping = dict(zip(gm[args.group_speaker_col], gm[args.group_col]))
+        df["_group"] = df["_speaker"].map(mapping).fillna(df["_speaker"])
+        n_merged = df["_speaker"].nunique() - df["_group"].nunique()
+        if n_merged:
+            print(f"[info] {n_merged} speaker id(s) merged into shared groups; "
+                  f"{df['_speaker'].nunique()} ids -> {df['_group'].nunique()} groups")
+
+    # ---- per-group table ----
+    spk = (df.groupby("_group")
+             .agg(n_utt=("_label", "size"), n_pos=("_label", "sum"),
+                  n_speakers=("_speaker", "nunique"))
              .reset_index())
     if len(spk) < 5:
-        sys.exit(f"[error] only {len(spk)} speakers - speaker-disjoint splitting is "
+        sys.exit(f"[error] only {len(spk)} speaker groups - speaker-disjoint splitting is "
                  "meaningless at this size.")
 
     # ---- greedy balanced assignment ----
@@ -103,28 +120,29 @@ def main():
             for i in range(3)
         ]
         i = int(min(range(3), key=lambda k: fill[k]))
-        assign[row["_speaker"]] = SPLITS[i]
+        assign[row["_group"]] = SPLITS[i]
         got_pos[i] += row["n_pos"]
         got_utt[i] += row["n_utt"]
 
-    df["split"] = df["_speaker"].map(assign)
+    df["split"] = df["_group"].map(assign)
 
-    # ---- leakage checks ----
-    sets = {s: set(df.loc[df["split"] == s, "_speaker"]) for s in SPLITS}
+    # ---- leakage checks (on groups, not ids) ----
+    sets = {s: set(df.loc[df["split"] == s, "_group"]) for s in SPLITS}
     for a, b in (("train", "val"), ("train", "test"), ("val", "test")):
         if sets[a] & sets[b]:
-            sys.exit(f"[FATAL] speaker overlap between {a} and {b}")
+            sys.exit(f"[FATAL] speaker group overlap between {a} and {b}")
+    spk_sets = {s: set(df.loc[df["split"] == s, "_speaker"]) for s in SPLITS}
 
     # ---- summary ----
-    print("\n" + "=" * 62)
-    print(f"{'split':6}{'speakers':>10}{'utts':>8}{'wrong':>7}{'pos_rate':>10}{'correct':>9}")
-    print("=" * 62)
+    print("\n" + "=" * 70)
+    print(f"{'split':6}{'groups':>8}{'speakers':>10}{'utts':>8}{'wrong':>7}{'pos_rate':>10}")
+    print("=" * 70)
     for s in SPLITS:
         sub = df[df["split"] == s]
         pos = int(sub["_label"].sum())
-        print(f"{s:6}{len(sets[s]):>10}{len(sub):>8}{pos:>7}"
-              f"{pos / max(len(sub), 1):>10.3f}{len(sub) - pos:>9}")
-    print("=" * 62)
+        print(f"{s:6}{len(sets[s]):>8}{len(spk_sets[s]):>10}{len(sub):>8}{pos:>7}"
+              f"{pos / max(len(sub), 1):>10.3f}")
+    print("=" * 70)
 
     # ---- warnings ----
     test_pos = int(df.loc[df["split"] == "test", "_label"].sum())
@@ -145,12 +163,15 @@ def main():
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     cols = [args.utt_col, args.speaker_col, "split", "_label"]
+    if args.groups:
+        cols.insert(2, "_group")
     if args.text_col and args.text_col in df.columns:
         cols.append(args.text_col)
     if args.contrast_col and args.contrast_col in df.columns:
         cols.append(args.contrast_col)
 
-    df[cols].rename(columns={"_label": "label"}).to_csv(out, index=False, encoding="utf-8")
+    rename = {"_label": "label", "_group": "group_id"}
+    df[cols].rename(columns=rename).to_csv(out, index=False, encoding="utf-8")
 
     digest = hashlib.sha256(out.read_bytes()).hexdigest()
     Path(str(out) + ".sha256").write_text(digest + "\n", encoding="utf-8")
@@ -160,9 +181,11 @@ def main():
         "seed": args.seed,
         "ratios": ratios,
         "sha256": digest,
+        "groups_used": bool(args.groups),
         "counts": {s: int((df["split"] == s).sum()) for s in SPLITS},
         "positives": {s: int(df.loc[df["split"] == s, "_label"].sum()) for s in SPLITS},
-        "speakers": {s: sorted(sets[s]) for s in SPLITS},
+        "groups": {s: sorted(sets[s]) for s in SPLITS},
+        "speakers": {s: sorted(spk_sets[s]) for s in SPLITS},
     }
     Path(str(out) + ".meta.json").write_text(
         json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
